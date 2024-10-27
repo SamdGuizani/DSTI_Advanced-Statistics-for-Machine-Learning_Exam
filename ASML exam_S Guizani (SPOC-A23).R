@@ -262,6 +262,8 @@ legend("topleft",
 print(round(cor(X[,(1:p)+1]), 2))
 
 
+
+
 # Exercise 2 ----
 
 
@@ -304,7 +306,7 @@ train_test_split = function(X, Y = NULL, test_size = 0.25)
     }
     else
     {
-      print("Can't split Y: Length of Y must be equal number of rows in X.")
+      print("Can't split Y: Length of Y must be equal to number of rows in X.")
     }
   }
   return(list(X_train = X_train, X_test = X_test))
@@ -328,6 +330,71 @@ CART_prune <- function(X, Y)
   b1 = b[1]
   cp1 = A[b1, 1]
   return(list(CART_pruned = prune(Tree, cp=cp1), tuned_cp = cp1))
+}
+
+summary_and_plots <- function(model)
+{
+  #' Prints a model summary and generates its plots
+  #' @param model A model of one of the classes: lm, rpart, randomForest, VSURF
+  
+  if (length(class(model)) == 1 && class(model) == "lm")
+  {
+    print(paste0('#### Model class: ', class(model), ' - Summary and Plots ####'))
+    
+    print(summary(model))
+    
+    par(mfrow = c(2,2))
+    plot(model)
+    par(mfrow = c(1,1))
+  }
+  else if (length(class(model)) == 1 && class(model) == "rpart")
+  {
+    print(paste0('#### Model class: ', class(model), ' - Summary and Plots ####'))
+    
+    print(summary(model))
+    
+    plotcp(model)
+    plot(model, uniform = TRUE, compress = TRUE, margin = 0.1)
+    text(model, use.n = TRUE, cex = 0.6)
+  }
+  else if ((length(class(model)) == 2 && class(model)[2] == "randomForest") ||
+           (length(class(model)) == 1 && class(model)[1] == "randomForest"))
+  {
+    print(paste0('#### Model class: ', class(model), ' - Summary and Plots ####'))
+    
+    print(model)
+    
+    plot(model)
+    varImpPlot(model)
+  }
+  else if ((length(class(model)) == 2 && class(model)[2] == "VSURF") ||
+           (length(class(model)) == 1 && class(model)[1] == "VSURF"))
+  {
+    print(paste0('#### Model class: ', class(model)[2], ' - Summary and Plots ####'))
+    
+    print(model$call)
+    print(summary(model))
+    
+    plot(model)
+  }
+  else
+  {
+    print(paste0('#### Model class not recognized. Can\'t display Summary and Plots ####'))
+  }
+}
+
+mse <- function(y_act, y_prd)
+{
+  #' Returns Mean Squared Error (MSE)
+  #' @param y_act vector of actual values
+  #' @param y_prd vector of predicted values
+  #' 
+  #' @return mean squared error
+  
+  M = cbind(y_act, y_prd)
+  M = M[complete.cases(M),] # keep only rows where y_act and y_prd are available
+  
+  return(mean((M[,1] - M[,2])^2))
 }
 
 
@@ -391,25 +458,19 @@ as.matrix(coef(logistic_regression)[which(coef(logistic_regression) != 0),]) # i
 
 #### CART classifier ----
 CART_pruning = CART_prune(X_train, Y_train)
-CART_classif = CART_pruning$CART_pruned
-models.Q1$CART_classif = CART_classif
+models.Q1$CART_classif = CART_pruning$CART_pruned
+summary_and_plots(CART_pruning$CART_pruned)
 
-CART_classif
-summary(CART_classif)
-printcp(CART_classif)
-plot(CART_classif, uniform = TRUE, compress = TRUE, margin = 0.1)
-text(CART_classif, use.n = TRUE, all = TRUE, cex = 0.6)
 
 #### Random Forest ----
 RF_classif = randomForest(X_train, Y_train)
 models.Q1$RF_classif = RF_classif
-
-varImpPlot(RF_classif)
+summary_and_plots(RF_classif)
 
 #### Random Forest for variable selection + CART classifier ----
 
 RF.vsurf = VSURF(X_train, Y_train)
-plot(RF.vsurf)
+summary_and_plots(RF.vsurf)
 
 colnames(X)[RF.vsurf$varselect.thres] # Variables kept after Elimination step
 colnames(X)[RF.vsurf$varselect.interp] # Variables kept after Interpretation step
@@ -417,13 +478,11 @@ colnames(X)[RF.vsurf$varselect.pred] # Variables kept after Prediction step
 
 RF_CART_classif1 = rpart(Y_train~., data=X_train[, RF.vsurf$varselect.interp]) # CART with variables selected after Interpretation step
 models.Q1$RF_CART_classif1 = RF_CART_classif1
-plot(RF_CART_classif1, uniform = TRUE, compress = TRUE, margin = 0.1)
-text(RF_CART_classif1, use.n = TRUE, all = TRUE, cex = 0.6)
+summary_and_plots(RF_CART_classif1)
 
 RF_CART_classif2 = rpart(Y_train~., data=X_train[, RF.vsurf$varselect.pred]) # CART with variables selected after Prediction step
 models.Q1$RF_CART_classif2 = RF_CART_classif2
-plot(RF_CART_classif2, uniform = TRUE, compress = TRUE, margin = 0.1)
-text(RF_CART_classif2, use.n = TRUE, all = TRUE, cex = 0.6)
+summary_and_plots(RF_CART_classif2)
 
 ### Models evaluation ----
 
@@ -449,7 +508,9 @@ for (model in models.Q1)
   print(cm)
   
 }
-  
+
+
+
 
 
 ## Exercise 2, Question 2 ----
@@ -457,16 +518,25 @@ for (model in models.Q1)
 setwd("C:/Users/SamdGuizani/OneDrive - Data ScienceTech Institute/Documents/DSTI_MSc DS and AI/02-Foundation/05-ASML/Exam")
 set.seed(310778)
 
-#Import dataset and preprocessing ----
+###Import dataset and preprocessing ----
 
 # Description of PM10 dataset can be found in this document:
 # Reference: https://cran.r-project.org/web/packages/VSURF/VSURF.pdf### 
-dfs = list(jus = VSURF::jus,
-           gui = VSURF::gui,
-           gcm = VSURF::gcm,
-           rep = VSURF::rep,
-           hri = VSURF::hri,
-           ail = VSURF::ail)
+jus = VSURF::jus
+gui = VSURF::gui
+gcm = VSURF::gcm
+rep = VSURF::rep
+hri = VSURF::hri
+ail = VSURF::ail
+
+dfs = list(jus = jus,
+           gui = gui,
+           gcm = gcm,
+           rep = rep,
+           hri = hri,
+           ail = ail)
+
+#### Approach 1: combined dataset modelling ----
 
 # Concatenate dataframes and create a new 'station' column
 combined_df = bind_rows(dfs, .id = "station")
@@ -487,6 +557,23 @@ test_df <- combined_df[-train_index, ]
 print(table(train_df$station))
 print(table(test_df$station))
 
+# Save data splits
+save(combined_df, train_df, test_df, file = "./Outputs/Preprocessed_datasets/Ex2_Q2_Approach_1_data.RData")
+
+#### Approach 2: separate 'station' datasets modelling ----
+
+splits.Q2.Approach2 = list() # empty list to hold data splits for each station
+
+for (station_id in c("jus", "gui", "gcm", "rep", "hri", "ail"))
+{
+  station_df = dfs[[station_id]]
+  station_df = station_df[!is.na(station_df$PM10),] # observations with missing response excluded
+  split = train_test_split(station_df)
+  splits.Q2.Approach2[[station_id]] = split
+}
+
+# Save data splits
+save(splits.Q2.Approach2, file = "./Outputs/Preprocessed_datasets/Ex2_Q2_Approach_2_data.RData")
 ### Exploratory data analysis ----
 
 # PM10 vs. station
@@ -498,59 +585,182 @@ cor_matrix <- cor(train_df[,2:ncol(train_df)], use = "complete.obs")
 print(round(cor_matrix, 2))
 heatmap(cor_matrix, symm = TRUE)
 
-### Models development ----
 
-models.Q2 = list() # empty list to collect candidate models
 
-#### Linear models
+### Approach 1: Models development for combined dataset ----
+
+models.Q2.Approach1 = list() # empty list to collect candidate models
+
+##### Linear models ----
 
 # Linear regression, only numeric explanatory variables 
 # (ATTENTION: SO2, NO, NO2 missing for some stations)
+# linear_regression.1 = lm(log(PM10) ~ ., data = train_df[,2:ncol(train_df)])
 linear_regression.1 = lm(PM10 ~ ., data = train_df[,2:ncol(train_df)])
-models.Q2$linear_regression.1 = linear_regression.1
-summary(linear_regression.1)
-plot(linear_regression.1)
+models.Q2.Approach1$linear_regression.1 = linear_regression.1
+summary_and_plots(linear_regression.1)
 
 # Linear regression, including 'station' and its interactions with numeric explanatory variables 
 # (ATTENTION: SO2, NO, NO2 excluded, because missing for some stations)
-linear_regression.2 = lm(PM10 ~ station * (T.min+T.max+T.moy+DV.maxvv+DV.dom+VV.max+VV.moy+PL.som+HR.min+HR.max+HR.moy+PA.moy+GTrouen+GTlehavre),
-                                           data = train_df)
-models.Q2$linear_regression.2 = linear_regression.2
+# linear_regression.2 = lm(log(PM10) ~ (station+T.min+T.max+T.moy+DV.maxvv+DV.dom+VV.max+VV.moy+PL.som+HR.min+HR.max+HR.moy+PA.moy+GTrouen+GTlehavre)^2,
+#                                            data = train_df)
+linear_regression.2 = lm(PM10 ~ (station+T.min+T.max+T.moy+DV.maxvv+DV.dom+VV.max+VV.moy+PL.som+HR.min+HR.max+HR.moy+PA.moy+GTrouen+GTlehavre)^2,
+                         data = train_df)
+models.Q2.Approach1$linear_regression.2 = linear_regression.2
+summary_and_plots(linear_regression.2)
 
-foo = stepAIC(linear_regression.2, lm(PM10~1, data = train_df), direction = 'both', test='F') # test model reduction
+#linear_regression.3 = stepAIC(linear_regression.2, lm(log(PM10)~1, data = train_df), direction = 'back', test='F') # test model reduction
+linear_regression.3 = stepAIC(linear_regression.2, lm(PM10~1, data = train_df), direction = 'back', test='F')
+models.Q2.Approach1$linear_regression.3 = linear_regression.3
+summary_and_plots(linear_regression.3)
 
-summary(foo)
-plot(foo)
+##### CART regression ----
+# CART_reg = CART_prune(train_df[,-2], log(train_df[,2]))
+CART_reg = CART_prune(train_df[,-2], train_df[,2])
+models.Q2.Approach1$CART_reg = CART_reg$CART_pruned
+summary_and_plots(CART_reg$CART_pruned)
 
-#### CART regression ----
-CART_pruning = CART_prune(train_df[,-2], train_df[,2])
-CART_reg = CART_pruning$CART_pruned
-models.Q2$CART_reg = CART_reg
+##### Random Forest ----
+# RF_reg = randomForest(log(PM10) ~ ., data = train_df, na.action = na.roughfix, ncores = detectCores()- 1) # problem with NA in predictor --> added na.action = na.roughfix
+RF_reg = randomForest(PM10 ~ ., data = train_df, na.action = na.roughfix, ncores = detectCores()- 1)
+models.Q2.Approach1$RF_reg = RF_reg
+summary_and_plots(RF_reg)
 
-CART_reg
-summary(CART_reg)
-printcp(CART_reg)
-plot(CART_reg, uniform = TRUE, compress = TRUE, margin = 0.1)
-text(CART_reg, use.n = TRUE, all = TRUE, cex = 0.6)
+##### Random Forest for variable selection + CART classifier ----
 
-#### Random Forest ----
-RF_reg = randomForest(PM10 ~ ., data = train_df, na.action = na.roughfix, ncores = detectCores()- 1) # problem with NA in predictor --> error
-models.Q2$RF_reg = RF_reg
-
-varImpPlot(RF_reg)
-
-#### Random Forest for variable selection + CART classifier ----
-
+# RF.vsurf = VSURF(log(PM10) ~ ., data = train_df, na.action = na.roughfix, ncores = detectCores()- 1)
 RF.vsurf = VSURF(PM10 ~ ., data = train_df, na.action = na.roughfix, ncores = detectCores()- 1)
-plot(RF.vsurf)
+summary_and_plots(RF.vsurf)
 
-colnames(X)[RF.vsurf$varselect.thres] # Variables kept after Elimination step
-colnames(X)[RF.vsurf$varselect.interp] # Variables kept after Interpretation step
-colnames(X)[RF.vsurf$varselect.pred] # Variables kept after Prediction step
+colnames(train_df[,-2])[RF.vsurf$varselect.thres] # Variables kept after Elimination step
+colnames(train_df[,-2])[RF.vsurf$varselect.interp] # Variables kept after Interpretation step
+colnames(train_df[,-2])[RF.vsurf$varselect.pred] # Variables kept after Prediction step
 
-RF_CART_reg1 = rpart(Y_train~., data=X_train[, RF.vsurf$varselect.interp], ncores = detectCores()- 1) # CART with variables selected after Interpretation step
-models.Q1$RF_CART_classif1 = RF_CART_classif1
+# RF_CART_reg1 = CART_prune(train_df[, colnames(train_df[,-2])[RF.vsurf$varselect.interp]], log(train_df$PM10)) # CART with variables selected after Interpretation step
+RF_CART_reg1 = CART_prune(train_df[, colnames(train_df[,-2])[RF.vsurf$varselect.interp]], train_df$PM10)
+models.Q2.Approach1$RF_CART_reg1 = RF_CART_reg1$CART_pruned
+summary_and_plots(RF_CART_reg1$CART_pruned)
 
-RF_CART_reg2 = rpart(Y_train~., data=X_train[, RF.vsurf$varselect.pred]) # CART with variables selected after Prediction step
-models.Q1$RF_CART_classif2 = RF_CART_classif2
+# RF_CART_reg2 = CART_prune(train_df[, colnames(train_df[,-2])[RF.vsurf$varselect.pred]], log(train_df$PM10)) # CART with variables selected after Prediction step
+RF_CART_reg2 = CART_prune(train_df[, colnames(train_df[,-2])[RF.vsurf$varselect.pred]], train_df$PM10)
+models.Q2.Approach1$RF_CART_reg2 = RF_CART_reg2$CART_pruned
+summary_and_plots(RF_CART_reg2$CART_pruned)
 
+##### Saving models ----
+save(models.Q2.Approach1, file = "./Outputs/Saved_models/Ex2_Q2_Approach_1_models.RData")
+
+##### Models evaluation ----
+
+# Execute to load existing datasets and developedmodels
+load(file = "./Outputs/Preprocessed_datasets/Ex2_Q2_Approach_1_data.RData")
+load(file = "./Outputs/Saved_models/Ex2_Q2_Approach_1_models.RData")
+
+for (model_id in names(models.Q2.Approach1))
+{
+  print(paste0('###########   ', model_id, '   ##########'))
+  model = models.Q2.Approach1[[model_id]]
+  print(model$call)
+  # print(model)
+  
+  # Predict result of test set observations 
+  Y_prd = predict(model, newdata = test_df)
+  
+  # Calculate Mean Squared Error (MSE)
+  MSE = mse(test_df$PM10, Y_prd)
+  print(paste0('Root Mean Squared Error = ', sqrt(MSE)))
+  
+  plot(test_df$PM10, Y_prd, main = model_id)
+  abline(b=1, a=0, col="black", lwd=3)
+  abline(lm(Y_prd ~ test_df$PM10), col="blue", , lwd=3, lty=2)
+  
+  legend("topleft", 
+         legend=c("Test data",
+                  "Target line (act. = pred.)",
+                  "Line (data)"),
+         col=c("black", "black", "blue"), 
+         pch=c(19, NA, NA), 
+         lwd=c(NA, 3, 3),
+         lty=c(NA, 1, 2)
+         )
+}
+
+
+
+
+### Approach 2: Models development for each 'station' dataset ----
+
+#### Models development ----
+
+models.Q2.Approach2 = list() # empty list to hold developed models for each station
+
+for (station_id in c("jus", "gui", "gcm", "rep", "hri", "ail"))
+{
+  models = list()
+  
+  data_split = splits.Q2.Approach2[[station_id]]
+  station_df_train = data_split$X_train
+  
+  # linear model
+  LM = lm(PM10 ~ (.)^2, data = station_df_train)
+  LM = stepAIC(LM, diresction = 'back', test = 'F')
+  models$LM = LM
+  summary_and_plots(LM)
+  
+  # CART model
+  CART_reg = CART_prune(station_df_train[,-2], station_df_train[,2])
+  models$CART_reg = CART_reg$CART_pruned
+  summary_and_plots(CART_reg$CART_pruned)
+  
+  # Random Forest model
+  RF_reg = randomForest(PM10 ~ ., data = station_df_train, na.action = na.roughfix, ncores = detectCores()- 1) # problem with NA in predictor --> added na.action = na.roughfix
+  models$RF_reg = RF_reg
+  summary_and_plots(RF_reg)
+  
+  models.Q2.Approach2[[station_id]] = models
+}
+
+#### Saving models ----
+save(models.Q2.Approach2, file = "./Outputs/Saved_models/Ex2_Q2_Approach_2_models.RData")
+
+
+#### Models evaluation ----
+
+# Execute to load existing datasets and developed models
+load(file = "./Outputs/Preprocessed_datasets/Ex2_Q2_Approach_2_data.RData")
+load(file = "./Outputs/Saved_models/Ex2_Q2_Approach_2_models.RData")
+
+for (station_id in names(models.Q2.Approach2))
+{
+  data_split = splits.Q2.Approach2[[station_id]]
+  station_df_test = data_split$X_test
+  
+  models = models.Q2.Approach2[[station_id]]
+  
+  for (model_id in names(models))
+  {
+    print(paste0('###########   ', station_id, "-", model_id, '   ##########'))
+    model = models[[model_id]]
+    print(model$call)
+    # print(model)
+    
+    # Predict result of test set observations 
+    Y_prd = predict(model, newdata = station_df_test)
+    
+    # Calculate Mean Squared Error (MSE)
+    MSE = mse(station_df_test$PM10, Y_prd)
+    print(paste0('Root Mean Squared Error = ', sqrt(MSE)))
+    
+    plot(station_df_test$PM10, Y_prd, main = paste0(station_id, "-", model_id))
+    abline(b=1, a=0, col="black", lwd=3)
+    abline(lm(Y_prd ~ station_df_test$PM10), col="blue", , lwd=3, lty=2)
+    
+    legend("topleft", 
+           legend=c("Test data",
+                    "Target line (act. = pred.)",
+                    "Line (data)"),
+           col=c("black", "black", "blue"), 
+           pch=c(19, NA, NA), 
+           lwd=c(NA, 3, 3),
+           lty=c(NA, 1, 2))
+  }
+}
