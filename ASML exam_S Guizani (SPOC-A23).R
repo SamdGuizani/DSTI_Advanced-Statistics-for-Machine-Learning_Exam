@@ -510,9 +510,6 @@ for (model in models.Q1)
 }
 
 
-
-
-
 ## Exercise 2, Question 2 ----
 
 setwd("C:/Users/SamdGuizani/OneDrive - Data ScienceTech Institute/Documents/DSTI_MSc DS and AI/02-Foundation/05-ASML/Exam")
@@ -580,11 +577,13 @@ save(splits.Q2.Approach2, file = "./Outputs/Preprocessed_datasets/Ex2_Q2_Approac
 boxplot(PM10 ~ station, data = train_df)
 summary(aov(PM10 ~ station, data = train_df))
 
+aov_PM10_vs_station = aov(PM10 ~ station, data = train_df)
+summary(aov_PM10_vs_station)
+
 # Correlation of response and explanatory variables
 cor_matrix <- cor(train_df[,2:ncol(train_df)], use = "complete.obs")
 print(round(cor_matrix, 2))
 heatmap(cor_matrix, symm = TRUE)
-
 
 
 ### Approach 1: Models development for combined dataset ----
@@ -683,8 +682,6 @@ for (model_id in names(models.Q2.Approach1))
          lty=c(NA, 1, 2)
          )
 }
-
-
 
 
 ### Approach 2: Models development for each 'station' dataset ----
